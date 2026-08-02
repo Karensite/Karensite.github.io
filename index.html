@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="fa">
+<head>
+<meta charset="UTF-8">
+<title>چت آنلاین کارن</title>
+<style>
+  body { background:#111; color:#eee; font-family:sans-serif; text-align:center; }
+  #box { width:90%; max-width:400px; margin:auto; background:#222; padding:20px; border-radius:10px; }
+  input { width:90%; padding:10px; margin:5px; border-radius:5px; border:none; background:#000; color:#eee; }
+  button { padding:10px 20px; border:none; border-radius:5px; background:#4fc3f7; color:#000; cursor:pointer; }
+  #chat { width:90%; max-width:600px; height:400px; background:#222; margin:20px auto; padding:10px; border-radius:10px; overflow-y:auto; text-align:left; }
+</style>
+</head>
+<body>
+
+<h1>چت آنلاین کارن</h1>
+
+<div id="box">
+  <h3>ثبت‌نام</h3>
+  <input id="su_user" placeholder="نام کاربری">
+  <input id="su_pass" type="password" placeholder="رمز">
+  <button onclick="signup()">ثبت‌نام</button>
+
+  <h3>ورود</h3>
+  <input id="li_user" placeholder="نام کاربری">
+  <input id="li_pass" type="password" placeholder="رمز">
+  <button onclick="login()">ورود</button>
+</div>
+
+<div id="chat" style="display:none;"></div>
+
+<div id="sendBox" style="display:none;">
+  <input id="msg" placeholder="پیامت رو بنویس...">
+  <button onclick="sendMsg()">ارسال</button>
+</div>
+
+<script src="web.js"></script>
+</body>
+</html>
