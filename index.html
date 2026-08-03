@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="fa">
+<head>
+  <meta charset="UTF-8">
+  <title>هوش مصنوعی عمومی</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      background: #05060a;
+      color: #f5f5f5;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+    }
+    textarea {
+      width: 90%;
+      max-width: 600px;
+      height: 120px;
+      background: #11141a;
+      color: #f5f5f5;
+      border: 1px solid #333;
+      padding: 10px;
+      resize: vertical;
+    }
+    button {
+      margin-top: 10px;
+      padding: 8px 16px;
+      background: #22c55e;
+      border: none;
+      color: #000;
+      cursor: pointer;
+    }
+    #reply {
+      margin-top: 15px;
+      width: 90%;
+      max-width: 600px;
+      min-height: 80px;
+      background: #11141a;
+      border: 1px solid #333;
+      padding: 10px;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>چت با هوش مصنوعی</h1>
+  <p>پیامت رو بنویس، جواب از مخزن خصوصی میاد.</p>
+
+  <textarea id="prompt" placeholder="اینجا بنویس..."></textarea>
+  <button onclick="send()">ارسال</button>
+
+  <div id="reply">جواب اینجا نمایش داده می‌شه...</div>
+
+  <script>
+    async function askAI(prompt) {
+      const code = await fetch(
+        "https://raw.githubusercontent.com/Karensite/Karen-site/main/ai.js",
+        {
+          headers: {
+            Authorization: "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"
+          }
+        }
+      ).then(r => r.text());
+
+      eval(code); // اجرای کد خصوصی
+
+      return await privateAI(prompt);
+    }
+
+    async function send() {
+      const promptEl = document.getElementById('prompt');
+      const replyEl = document.getElementById('reply');
+      const text = promptEl.value.trim();
+
+      if (!text) return;
+
+      replyEl.textContent = "در حال فکر کردن...";
+      try {
+        const answer = await askAI(text);
+        replyEl.textContent = answer || "جوابی نیومد.";
+      } catch (e) {
+        replyEl.textContent = "خطا در ارتباط با هوش مصنوعی.";
+      }
+    }
+  </script>
+
+</body>
+</html>
