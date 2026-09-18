@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Case Chat Smart</title>
+    <style>
+        :root { --p: #6c5ce7; --bg: #f0f2f5; --s: #dcf8c6; --r: #fff; --d: #ff7675; --dark: #2d3436; }
+        * { box-sizing: border-box; outline: none; font-family: 'Segoe UI', Tahoma, sans-serif; }
+        body { background: var(--bg); margin: 0; display: flex; justify-content: center; height: 100vh; overflow: hidden; }
+        .app { width: 100%; max-width: 480px; background: #fff; height: 100%; display: flex; flex-direction: column; position: relative; box-shadow: 0 0 20px rgba(0,0,0,0.1); }
+        
+        /* Views */
+        .view { display: none; height: 100%; flex-direction: column; animation: fade 0.3s; }
+        .view.active { display: flex; }
+        @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+
+        /* Auth View */
+        .auth-container { flex: 1; display: flex; align-items: center; justify-content: center; padding: 20px; background: linear-gradient(135deg, var(--p), #a29bfe); }
+        .auth-box { background: white; padding: 40px; border-radius: 20px; width: 100%; max-width: 400px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
+        input { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 8px; transition: 0.3s; }
+        input:focus { border-color: var(--p); }
+        button { width: 100%; padding: 12px; background: var(--p); color: white; border: none; border-radius: 8px; cursor: pointer; margin-top: 5px; font-weight: bold; }
+        button.sec { background: #00b894; }
+
+        /* Chat View */
+        .hdr { background: var(--p); color: white; padding: 15px; display: flex; justify-content: space-between; align-items: center; }
+        .stor-info { font-size: 10px; background: rgba(0,0,0,0.2); padding: 2px 8px; border-radius: 4px; }
+        .side { background: #f8f9fa; border-bottom: 1px solid #eee; max-height: 150px; overflow-y: auto; padding: 10px; }
+        .ct { padding: 10px; border-bottom: 1px solid #eee; cursor: pointer; display: flex; align-items: center; gap: 10px; }
+        .ct:hover { background: #eef2ff; }
+        .msgs { flex: 1; overflow-y: auto; padding: 15px; background: #e5ddd5; display: flex; flex-direction: column; gap: 10px; }
+        .msg { max-width: 75%; padding: 10px 15px; border-radius: 15px; font-size: 14px; word-wrap: break-word; position: relative; user-select: none; animation: popIn 0.3s; }
+        @keyframes popIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        .msg.sent { background: var(--s); align-self: flex-end; border-bottom-right-radius: 2px; }
+        .msg.rcv { background: var(--r); align-self: flex-start; border-bottom-left-radius: 2px; }
+        .msg.admin { background: #ffeaa7; border: 2px solid #fdcb6e; align-self: flex-start; }
+        .inp-area { padding: 10px; background: #f0f0f0; display: flex; gap: 10px; align-items: center; }
+        .ibtn { width: 40px; height: 40px; border-radius: 50%; border: none; background: white; cursor: pointer; font-size: 18px; }
+
+        /* Admin View */
+        .admin-body { background: var(--dark); color: white; padding: 20px; overflow-y: auto; }
+        .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px; }
+        .stat-card { background: #353b48; padding: 15px; border-radius: 10px; text-align: center; }
+        .user-row { display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid #555; align-items: center; }
+        .btn-sm { padding: 5px 10px; font-size: 11px; width: auto; margin: 0 2px; }
+    </style>
+</head>
+<body>
+    <div class="app">
+        
+        <!-- نمای ورود/ثبت‌نام -->
+        <div id="view-auth" class="view active">
+            <div class="auth-container">
+                <div class="auth-box">
+                    <h2 style="color:#6c5ce7">🔥 Case Chat</h2>
+                    <input type="text" id="lu" placeholder="نام کاربری">
+                    <input type="password" id="lpw" placeholder="رمز عبور">
+                    <button onclick="login()">ورود به حساب</button>
+                    <p id="le" style="color:red;font-size:12px"></p>
+                    <hr style="margin:20px 0;border:0;border-top:1px solid #eee">
+                    <h3>ثبت‌نام رایگان</h3>
+                    <input type="text" id="rn" placeholder="نام نمایشی">
+                    <input type="text" id="ru" placeholder="نام کاربری">
+                    <input type="password" id="rp" placeholder="رمز عبور">
+                    <button class="sec" onclick="reg()">ایجاد حساب</button>
+                    <p style="font-size:12px; margin-top:15px; cursor:pointer; color:#666" onclick="showAdminLogin()">ورود مدیر</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- نمای چت -->
+        <div id="view-chat" class="view">
+            <div class="hdr">
+                <span id="ht">چت عمومی</span>
+                <div>
+                    <span class="stor-info" id="si">...</span>
+                    <button onclick="logout()" style="width:auto;padding:5px;background:#ff7675;border:none;margin-left:10px">خروج</button>
+                </div>
+            </div>
+            <div class="side">
+                <div class="ct" onclick="openChat('public')"><b>🌐 چت عمومی</b></div>
+                <div id="cl"></div>
+            </div>
+            <div class="msgs" id="mc"></div>
+            <div class="inp-area">
+                <input type="text" id="mi" placeholder="پیام..." onkeypress="if(event.key==='Enter')sendTxt()" style="flex:1;padding:10px;border-radius:20px;border:1px solid #ddd">
+                <button class="ibtn" onclick="sendTxt()" style="background:#6c5ce7;color:white">➤</button>
+            </div>
+        </div>
+
+        <!-- نمای ادمین -->
+        <div id="view-admin" class="view admin-body">
+            <h1>👮‍♂️ پنل مدیریت</h1>
+            <button onclick="loadAdminData()" style="background:#00b894;margin-bottom:20px">🔄 بروزرسانی</button>
+            <button onclick="showAuth()" style="background:#636e72;margin-bottom:20px">بازگشت به ورودی</button>
+            
+            <div class="stat-grid">
+                <div class="stat-card"><h3>کاربران</h3><div id="total-u">0</div></div>
+                <div class="stat-card"><h3>پیام‌ها</h3><div id="total-m">0</div></div>
+                <div class="stat-card"><h3>حجم</h3><div id="db-size">0 KB</div></div>
+            </div>
+            <h2>لیست کاربران</h2>
+            <div id="users-list"></div>
+        </div>
+
+    </div>
+
+    <script>
+        // ================= تنظیمات حیاتی =================
+        const SK = '$2a$10$D7BwEyprqdToYeURLDW2D.ysb8/Bc8t3qAd82Ix/syg53aLUmzJoC'; 
+        let MK = '$2a$10$i65hmMqr/Bwjox8aODVMn.2a9i3a34SEqxkxcSk9FA21aAzELweRC'; 
+        let BI = '6aad59e4ac6210605adce854'; 
+        const AB = 'https://api.jsonbin.io/v3';
+        let AU = `${AB}/b/${BI}`;
+
+        let CU = null;
+        let CC = 'public';
+        let RI = null;
+
+        // ================= توابع پایه =================
+        async function getDB() {
+            try {
+                const r = await fetch(AU, { headers: { 'X-Master-Key': MK } });
+                return (await r.json()).record || { users: [], messages: [] };
+            } catch (e) { return null; }
+        }
+
+        async function saveDB(data) {
+            try {
+                await fetch(AU, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Secret-Key': SK }, body: JSON.stringify(data) });
+                return true;
+            } catch (e) { return false; }
+        }
+
+        async function checkAndRotate() {
+            try {
+                const r = await fetch(AU, { method: 'HEAD', headers: { 'X-Master-Key': MK } });
+                const size = parseInt(r.headers.get('content-length')) || 0;
+                const kb = (size / 1024).toFixed(1);
+                const el = document.getElementById('si');
+                if(el) el.innerText = `حافظه: ${kb} KB`;
+                
+                if (size > 400 * 1024) {
+                    if(el) el.innerText = '⚠️ ارتقا...';
+                    const nb = await fetch(`${AB}/b`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'X-Secret-Key': SK },
+                        body: JSON.stringify({ users: [], messages: [] })
+                    });
+                    const nd = await nb.json();
+                    if (nd.metadata && nd.metadata.id) {
+                        BI = nd.metadata.id;
+                        AU = `${AB}/b/${BI}`;
+                        alert('✅ حافظه جدید ساخته شد!');
+                    }
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        // ================= مدیریت نماها (Views) =================
+        function showView(id) {
+            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+        }
+
+        function showAuth() { showView('view-auth'); }
+        function showChat() { showView('view-chat'); }
+        function showAdmin() { showView('view-admin'); }
+
+        // ================= احراز هویت =================
+        async function reg() {
+            const n = document.getElementById('rn').value.trim();
+            const u = document.getElementById('ru').value.trim().toLowerCase();
+            const p = document.getElementById('rp').value;
+            if(!n || !u || !p) return alert('همه فیلدها لازم است');
+            
+            let db = await getDB();
+            if(db.users.find(x => x.username === u)) return alert('تکراری است');
+            
+            db.users.push({ name: n, username: u, password: p, contacts: [] });
+            if(await saveDB(db)) {
+                alert('ثبت‌نام شد! وارد شوید.');
+            } else alert('خطا در سرور');
+        }
+
+        async function login() {
+            const u = document.getElementById('lu').value.trim().toLowerCase();
+            const p = document.getElementById('lpw').value;
+            let db = await getDB();
+            const f = db.users.find(x => x.username === u && x.password === p);
+            
+            if(f) {
+                CU = f;
+                showChat();
+                loadContacts();
+                openChat('public');
+                RI = setInterval(() => { loadMsgs(); checkAndRotate(); }, 3000);
+            } else {
+                document.getElementById('le').innerText = 'اشتباه است';
+            }
+        }
+
+        function logout() {
+            CU = null;
+            clearInterval(RI);
+            showAuth();
+        }
+
+        // ================= چت =================
+        async function loadMsgs() {
+            if(!CU) return;
+            let db = await getDB();
+            const c = document.getElementById('mc');
+            const ms = db.messages.filter(m => m.chatId === CC).slice(-50);
+            c.innerHTML = '';
+            ms.forEach(m => {
+                const d = document.createElement('div');
+                const isAdmin = m.sender === 'ADMIN_SYSTEM';
+                d.className = `msg ${isAdmin ? 'admin' : (m.sender === CU.username ? 'sent' : 'rcv')}`;
+                
+                if(!isAdmin && m.sender === CU.username) {
+                    d.ondblclick = async () => {
+                        if(confirm('حذف؟')) {
+                            db.messages = db.messages.filter(x => x.id !== m.id);
+                            await saveDB(db); loadMsgs();
+                        }
+                    };
+                }
+                d.innerHTML = `<b>${m.senderName}</b><br>${m.content}<div style="font-size:10px;opacity:0.7">${m.time}</div>`;
+                c.appendChild(d);
+            });
+            c.scrollTop = c.scrollHeight;
+        }
+
+        async function sendTxt() {
+            const i = document.getElementById('mi');
+            if(!i.value.trim()) return;
+            let db = await getDB();
+            db.messages.push({
+                id: Date.now(), sender: CU.username, senderName: CU.name,
+                chatId: CC, content: i.value, type: 'text',
+                time: new Date().toLocaleTimeString()
+            });
+            await saveDB(db);
+            i.value = '';
+            loadMsgs();
+        }
+
+        function openChat(id) {
+            CC = id;
+            document.getElementById('ht').innerText = id === 'public' ? 'چت عمومی' : id;
+            loadMsgs();
+        }
+
+        async function loadContacts() {
+             let db = await getDB();
+             const l = document.getElementById('cl');
+             l.innerHTML = '';
+             if(CU.contacts) {
+                 CU.contacts.forEach(c => {
+                     l.innerHTML += `<div class="ct" onclick="openChat('${c}')">👤 ${c}</div>`;
+                 });
+             }
+        }
+
+        // ================= ادمین =================
+        function showAdminLogin() {
+            const pass = prompt("رمز ادمین را وارد کنید:");
+            if(pass === "admin123") { // رمز ساده برای ورود به پنل
+                showAdmin();
+                loadAdminData();
+            } else if(pass) alert("رمز اشتباه است");
+        }
+
+        async function loadAdminData() {
+            let db = await getDB();
+            document.getElementById('total-u').innerText = db.users.length;
+            document.getElementById('total-m').innerText = db.messages.length;
+            
+            const r = await fetch(AU, { method: 'HEAD', headers: { 'X-Master-Key': MK } });
+            const s = parseInt(r.headers.get('content-length')) || 0;
+            document.getElementById('db-size').innerText = (s/1024).toFixed(1) + ' KB';
+
+            const list = document.getElementById('users-list');
+            list.innerHTML = '';
+            db.users.forEach(u => {
+                list.innerHTML += `
+                    <div class="user-row">
+                        <span>${u.name} (@${u.username})</span>
+                        <div>
+                            <button class="btn-sm" style="background:#ff7675" onclick="delUser('${u.username}')">حذف</button>
+                        </div>
+                    </div>`;
+            });
+        }
+
+        async function delUser(u) {
+            if(!confirm('حذف شود؟')) return;
+            let db = await getDB();
+            db.users = db.users.filter(x => x.username !== u);
+            db.messages = db.messages.filter(m => m.sender !== u);
+            await saveDB(db);
+            loadAdminData();
+        }
+    </script>
+</body>
+  </html>
