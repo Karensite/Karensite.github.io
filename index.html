@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Case Chat - Online</title>
+    <style>
+        body { font-family: Tahoma, sans-serif; background: #f0f2f5; margin: 0; display: flex; justify-content: center; height: 100vh; }
+        .app-container { width: 100%; max-width: 450px; background: white; height: 100%; display: flex; flex-direction: column; box-shadow: 0 0 20px rgba(0,0,0,0.1); }
+        .page { display: none; flex: 1; flex-direction: column; }
+        .page.active { display: flex; }
+        
+        /* Auth Styles */
+        .auth-box { padding: 40px; text-align: center; margin: auto; }
+        input { width: 90%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 8px; }
+        button { width: 95%; padding: 12px; background: #0088cc; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; margin-top: 10px; }
+        .error { color: red; font-size: 12px; }
+        
+        /* Chat Styles */
+        .header { background: #0088cc; color: white; padding: 15px; display: flex; justify-content: space-between; align-items: center; }
+        .messages { flex: 1; overflow-y: auto; padding: 15px; background: #e5ddd5; display: flex; flex-direction: column; gap: 10px; }
+        .msg { max-width: 75%; padding: 10px; border-radius: 10px; position: relative; font-size: 14px; word-wrap: break-word; }
+        .msg.sent { background: #dcf8c6; align-self: flex-end; border-bottom-right-radius: 0; }
+        .msg.received { background: white; align-self: flex-start; border-bottom-left-radius: 0; }
+        .msg img, .msg video { max-width: 100%; border-radius: 5px; margin-top: 5px; }
+        .input-area { padding: 10px; background: #f0f0f0; display: flex; gap: 10px; align-items: center; }
+        .input-area input { margin: 0; flex: 1; }
+        .icon-btn { width: 40px; height: 40px; padding: 0; display: flex; justify-content: center; align-items: center; font-size: 20px; background: transparent; color: #555; border: none; cursor: pointer; }
+        
+        /* Contacts */
+        .contacts { background: white; border-bottom: 1px solid #ddd; max-height: 150px; overflow-y: auto; }
+        .contact { padding: 10px; border-bottom: 1px solid #eee; cursor: pointer; display: flex; align-items: center; gap: 10px; }
+        .avatar { width: 40px; height: 40px; background: #ccc; border-radius: 50%; display: flex; justify-content: center; align-items: center; color: white; }
+    </style>
+</head>
+<body>
+
+    <!-- صفحه ورود -->
+    <div id="login-page" class="page active">
+        <div class="auth-box">
+            <h2>ورود به Case Chat</h2>
+            <input type="text" id="l-user" placeholder="نام کاربری">
+            <input type="password" id="l-pass" placeholder="رمز عبور">
+            <button onclick="login()">ورود</button>
+            <p id="l-error" class="error"></p>
+            <hr style="margin: 20px 0;">
+            <h3>ثبت‌نام جدید</h3>
+            <input type="text" id="r-name" placeholder="نام نمایشی">
+            <input type="text" id="r-user" placeholder="نام کاربری (یکتا)">
+            <input type="password" id="r-pass" placeholder="رمز عبور">
+            <button onclick="register()" style="background: #005f8d;">ثبت‌نام</button>
+            <p id="r-error" class="error"></p>
+        </div>
+    </div>
+
+    <!-- صفحه چت -->
+    <div id="chat-page" class="page">
+        <div class="header">
+            <span id="my-name">کاربر</span>
+            <button onclick="logout()" style="width: auto; padding: 5px 10px; background: #d9534f; margin:0;">خروج</button>
+        </div>
+        
+        <div class="contacts">
+            <div class="contact" onclick="openChat('public')">
+                <div class="avatar" style="background: #0088cc;">🌐</div>
+                <b>چت عمومی</b>
+            </div>
+            <div style="padding: 10px; display: flex; gap: 5px;">
+                <input type="text" id="new-contact-user" placeholder="نام کاربری مخاطب..." style="margin:0; width: 70%;">
+                <button onclick="addContact()" style="width: 25%; padding: 5px; margin:0;">+</button>
+            </div>
+            <div id="contacts-list"></div>
+        </div>
+
+        <div class="messages" id="msg-container"></div>
+
+        <div class="input-area">
+            <input type="file" id="file-input" style="display: none;" onchange="sendFile()">
+            <button class="icon-btn" onclick="document.getElementById('file-input').click()">📎</button>
+            <button class="icon-btn" onmousedown="startRecord()" onmouseup="stopRecord()">🎤</button>
+            <input type="text" id="msg-input" placeholder="پیام..." onkeypress="if(event.key==='Enter') sendText()">
+            <button class="icon-btn" onclick="sendText()" style="color: #0088cc;">➤</button>
+        </div>
+    </div>
+
+    <script>
+        // ================= تنظیمات JSONBin =================
+        const BIN_ID = '6aad2b9dac6210605adc3af4'; 
+        const MASTER_KEY = '$2a$10$B2vErPUhRhSPVpQSRTxfeOrnuHZHTeFrPN4Q32Tlu6AMmQXdxMNrm';
+        const API_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
+
+        let currentUser = null;
+        let currentChat = 'public';
+        let refreshInterval;
+        let mediaRecorder;
+        let audioChunks = [];
+
+        // ================= توابع کمکی API =================
+        async function getData() {
+            try {
+                const res = await fetch(API_URL, { headers: { 'X-Master-Key': MASTER_KEY } });
+                const data = await res.json();
+                return data.record || { users: [], messages: [] };
+            } catch (e) {
+                console.error("Connection Error:", e);
+                return { users: [], messages: [] };
+            }
+        }
+
+        async function saveData(data) {
+            await fetch(API_URL, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'X-Master-Key': MASTER_KEY },
+                body: JSON.stringify(data)
+            });
+        }
+
+        // ================= ثبت‌نام =================
+        async function register() {
+            const name = document.getElementById('r-name').value;
+            const user = document.getElementById('r-user').value.toLowerCase();
+            const pass = document.getElementById('r-pass').value;
+            
+            if(!name || !user || !pass) return alert('همه فیلدها لازم است');
+            
+            const db = await getData();
+            if(db.users.find(u => u.username === user)) {
+                document.getElementById('r-error').innerText = 'نام کاربری تکراری است';
+                return;
+            }
+
+            db.users.push({ name, username: user, password: pass, contacts: [] });
+            await saveData(db);
+            alert('ثبت‌نام شد! وارد شوید.');
+            document.getElementById('r-error').innerText = '';
+        }
+
+        // ================= ورود =================
+        async function login() {
+            const user = document.getElementById('l-user').value.toLowerCase();
+            const pass = document.getElementById('l-pass').value;
+            const errorEl = document.getElementById('l-error');
+
+            const db = await getData();
+            const found = db.users.find(u => u.username === user && u.password === pass);
+
+            if(found) {
+                currentUser = found;
+                showChat();
+            } else {
+                errorEl.innerText = 'نام کاربری یا رمز اشتباه است';
+            }
+        }
+
+        function logout() {
+            currentUser = null;
+            clearInterval(refreshInterval);
+            document.getElementById('login-page').classList.add('active');
+            document.getElementById('chat-page').classList.remove('active');
+        }
+
+        function showChat() {
+            document.getElementById('login-page').classList.remove('active');
+            document.getElementById('chat-page').classList.add('active');
+            document.getElementById('my-name').innerText = currentUser.name;
+            loadContacts();
+            openChat('public');
+            
+            // رفرش خودکار پیام‌ها هر ۳ ثانیه
+            refreshInterval = setInterval(loadMessages, 3000);
+        }
+
+        // ================= چت =================
+        async function loadMessages() {
+            const db = await getData();
+            const container = document.getElementById('msg-container');
+            container.innerHTML = '';
+            
+            const msgs = db.messages.filter(m => {
+                if(currentChat === 'public') return m.channel === 'public';
+                return (m.sender === currentUser.username && m.receiver === currentChat) || 
+                       (m.sender === currentChat && m.receiver === currentUser.username);
+            });
+
+            msgs.forEach(msg => {
+                const div = document.createElement('div');
+                div.className = `msg ${msg.sender === currentUser.username ? 'sent' : 'received'}`;
+                
+                let content = msg.content;
+                if(msg.type === 'image') content = `<img src="${msg.content}">`;
+                if(msg.type === 'video') content = `<video src="${msg.content}" controls></video>`;
+                if(msg.type === 'audio') content = `<audio src="${msg.content}" controls></audio>`;
+                
+                div.innerHTML = `<b>${msg.senderName}</b><br>${content}<div style="font-size:10px; opacity:0.7">${msg.time}</div>`;
+                container.appendChild(div);
+            });
+            container.scrollTop = container.scrollHeight;
+        }
+
+        async function sendText() {
+            const input = document.getElementById('msg-input');
+            if(!input.value.trim()) return;
+            
+            const db = await getData();
+            db.messages.push({
+                sender: currentUser.username,
+                senderName: currentUser.name,
+                receiver: currentChat === 'public' ? null : currentChat,
+                channel: currentChat,
+                content: input.value,
+                type: 'text',
+                time: new Date().toLocaleTimeString()
+            });
+            
+            await saveData(db);
+            input.value = '';
+            loadMessages();
+        }
+
+        async function sendFile() {
+            const file = document.getElementById('file-input').files[0];
+            if(!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                const db = await getData();
+                db.messages.push({
+                    sender: currentUser.username,
+                    senderName: currentUser.name,
+                    receiver: currentChat === 'public' ? null : currentChat,
+                    channel: currentChat,
+                    content: e.target.result,
+                    type: file.type.startsWith('image') ? 'image' : (file.type.startsWith('video') ? 'video' : 'file'),
+                    time: new Date().toLocaleTimeString()
+                });
+                await saveData(db);
+                loadMessages();
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // ================= ویس رکوردر =================
+        function startRecord() {
+            navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+                mediaRecorder = new MediaRecorder(stream);
+                mediaRecorder.start();
+                mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+            });
+        }
+        function stopRecord() {
+            if(mediaRecorder) {
+                mediaRecorder.stop();
+                mediaRecorder.onstop = async () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/mp3' });
+                    const reader = new FileReader();
+                    reader.onload = async function(e) {
+                        const db = await getData();
+                        db.messages.push({
+                            sender: currentUser.username,
+                            senderName: currentUser.name,
+                            receiver: currentChat === 'public' ? null : currentChat,
+                            channel: currentChat,
+                            content: e.target.result,
+                            type: 'audio',
+                            time: new Date().toLocaleTimeString()
+                        });
+                        await saveData(db);
+                        loadMessages();
+                    };
+                    reader.readAsDataURL(audioBlob);
+                    audioChunks = [];
+                };
+            }
+        }
+
+        // ================= مخاطبین =================
+        async function addContact() {
+            const username = document.getElementById('new-contact-user').value.toLowerCase();
+            const db = await getData();
+            const user = db.users.find(u => u.username === username);
+            
+            if(user && username !== currentUser.username) {
+                if(!currentUser.contacts.includes(username)) {
+                    currentUser.contacts.push(username);
+                    const userIndex = db.users.findIndex(u => u.username === currentUser.username);
+                    db.users[userIndex] = currentUser;
+                    await saveData(db);
+                    loadContacts();
+                }
+            } else {
+                alert('کاربر یافت نشد');
+            }
+        }
+
+        function loadContacts() {
+            const list = document.getElementById('contacts-list');
+            list.innerHTML = '';
+            currentUser.contacts.forEach(contact => {
+                const div = document.createElement('div');
+                div.className = 'contact';
+                div.innerHTML = `<div class="avatar">👤</div><b>${contact}</b>`;
+                div.onclick = () => openChat(contact);
+                list.appendChild(div);
+            });
+        }
+
+        function openChat(chatId) {
+            currentChat = chatId;
+            document.querySelector('.contact.active')?.classList.remove('active');
+            loadMessages();
+        }
+    </script>
+</body>
+  </html>
