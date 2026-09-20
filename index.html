@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Case</title>
+    <!-- لود کردن کتابخانه Supabase -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { margin: 0; background: #000; color: #fff; font-family: Tahoma; display: flex; justify-content: center; height: 100vh; }
+        .app { width: 100%; max-width: 450px; background: #111; height: 100%; display: flex; flex-direction: column; border: 1px solid #333; }
+        
+        /* صفحات */
+        .page { display: none; height: 100%; flex-direction: column; }
+        .page.active { display: flex; }
+        
+        /* استایل ورود */
+        .auth { padding: 40px; text-align: center; margin: auto; }
+        input { width: 100%; padding: 12px; margin: 10px 0; background: #222; border: 1px solid #444; color: white; border-radius: 8px; box-sizing: border-box; }
+        button { width: 100%; padding: 12px; background: #00ff88; color: black; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+        
+        /* استایل چت */
+        .hdr { padding: 15px; background: #1a1a1a; border-bottom: 1px solid #333; display: flex; justify-content: space-between; }
+        .sidebar { padding: 10px; background: #161616; border-bottom: 1px solid #333; max-height: 200px; overflow-y: auto; }
+        .search-box { display: flex; gap: 5px; margin-bottom: 10px; }
+        .contact { padding: 10px; border-bottom: 1px solid #333; cursor: pointer; }
+        .contact:hover { background: #333; }
+        
+        .msgs { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 10px; }
+        .msg { padding: 10px; border-radius: 10px; max-width: 80%; font-size: 14px; }
+        .msg.sent { background: #00ff88; color: black; align-self: flex-end; }
+        .msg.rcv { background: #333; align-self: flex-start; }
+        
+        .inp-area { padding: 10px; background: #1a1a1a; display: flex; gap: 5px; border-top: 1px solid #333; }
+        .inp-area input { margin: 0; }
+        .send-btn { width: 50px; margin: 0; }
+    </style>
+</head>
+<body>
+
+<div class="app">
+    <!-- صفحه ورود -->
+    <div id="loginPage" class="page active">
+        <div class="auth">
+            <h2 style="color:#00ff88">Chat Case</h2>
+            <input type="text" id="username" placeholder="نام کاربری">
+            <input type="password" id="password" placeholder="رمز عبور">
+            <button onclick="handleLogin()">ورود</button>
+            <p id="msg" style="color:red; font-size:12px; margin-top:10px;"></p>
+        </div>
+    </div>
+
+    <!-- صفحه چت -->
+    <div id="chatPage" class="page">
+        <div class="hdr">
+            <span id="chatTitle">چت</span>
+            <button onclick="location.reload()" style="width:auto; background:#ff4444; color:white; padding:5px 10px;">خروج</button>
+        </div>
+        
+        <div class="sidebar">
+            <div class="search-box">
+                <input type="text" id="searchInput" placeholder="جستجوی کاربر...">
+                <button onclick="searchUser()" style="width:50px;">🔍</button>
+            </div>
+            <div id="contactList"></div>
+        </div>
+
+        <div class="msgs" id="messageList">
+            <div style="text-align:center; color:#666; margin-top:20px;">مخاطبی انتخاب کنید</div>
+        </div>
+
+        <div class="inp-area">
+            <input type="text" id="messageInput" placeholder="پیام..." disabled>
+            <button class="send-btn" onclick="sendMessage()" disabled id="sendBtn">➤</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // تنظیمات اتصال
+    const SUPABASE_URL = 'https://lzlubkybrzkomjefqwxk.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx6bHVia3licnprb21qZWZxd3hrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk3MjgyODIsImV4cCI6MjEwNTMwNDI4Mn0.txxWNKJfffkE7quUKJ4v2E6EiotRHFrWDRTKVa9TYPs';
+    
+    let supabase;
+    let myUser = null;
+    let targetUser = null;
+
+    // راه‌اندازی اولیه
+    window.onload = function() {
+        if (window.supabase) {
+            supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+            console.log("Supabase Loaded Successfully");
+        } else {
+            alert("خطا: اینترنت قطع است یا کتابخانه لود نشد.");
+        }
+    };
+
+    // تابع ورود
+    async function handleLogin() {
+        const u = document.getElementById('username').value.trim();
+        const p = document.getElementById('password').value;
+        const msgBox = document.getElementById('msg');
+
+        if (!u || !p) {
+            msgBox.innerText = "لطفاً نام و رمز را وارد کنید";
+            return;
+        }
+
+        msgBox.innerText = "در حال اتصال...";
+        
+        try {
+            // چک کردن مسدودی (اختیاری)
+            try {
+                const { data } = await supabase.from('Blocked_users').select('*').eq('username', u).single();
+                if (data) {
+                    msgBox.innerText = "شما مسدود شده‌اید.";
+                    return;
+                }
+            } catch (e) { console.log("Blocked check skipped"); }
+
+            // ورود موفق
+            myUser = u;
+            document.getElementById('loginPage').classList.remove('active');
+            document.getElementById('chatPage').classList.add('active');
+            msgBox.innerText = "";
+            
+        } catch (err) {
+            console.error(err);
+            msgBox.innerText = "خطا در اتصال به سرور";
+        }
+    }
+
+    // جستجوی کاربر
+    async function searchUser() {
+        const q = document.getElementById('searchInput').value.trim();
+        if (!q) return;
+
+        try {
+            const { data } = await supabase.from('Karensite').select('fram_id').eq('fram_id', q).limit(1);
+            const list = document.getElementById('contactList');
+            
+            if (data && data.length > 0) {
+                list.innerHTML += `<div class="contact" onclick="openChat('${q}')">${q} (کاربر)</div>`;
+            } else {
+                list.innerHTML += `<div class="contact" onclick="openChat('${q}')">${q} (گروه/عمومی)</div>`;
+            }
+        } catch (e) {
+            alert("خطا در جستجو");
+        }
+    }
+
+    // باز کردن چت
+    function openChat(userId) {
+        targetUser = userId;
+        document.getElementById('chatTitle').innerText = "چت با: " + userId;
+        document.getElementById('messageInput').disabled = false;
+        document.getElementById('sendBtn').disabled = false;
+        loadMessages();
+    }
+
+    // ارسال پیام
+    async function sendMessage() {
+        const input = document.getElementById('messageInput');
+        const text = input.value.trim();
+        
+        if (!text || !targetUser) return;
+
+        try {
+            const { error } = await supabase.from('Karensite').insert([
+                {
+                    fram_id: myUser,
+                    To_id: targetUser,
+                    Content: text,
+                    Type: 'private'
+                }
+            ]);
+
+            if (error) throw error;
+            
+            input.value = '';
+            loadMessages(); // رفرش پیام‌ها
+            
+        } catch (err) {
+            alert("خطا در ارسال: " + err.message);
+        }
+    }
+
+    // دریافت پیام‌ها
+    async function loadMessages() {
+        if (!targetUser) return;
+
+        try {
+            const { data, error } = await supabase
+                .from('Karensite')
+                .select('*')
+                .or(`and(fram_id.eq.${myUser},To_id.eq.${targetUser}),and(fram_id.eq.${targetUser},To_id.eq.${myUser})`)
+                .order('Id', { ascending: true });
+
+            if (error) throw error;
+
+            const container = document.getElementById('messageList');
+            container.innerHTML = '';
+            
+            data.forEach(msg => {
+                const div = document.createElement('div');
+                div.className = `msg ${msg.fram_id === myUser ? 'sent' : 'rcv'}`;
+                div.innerText = msg.Content;
+                
+                // حذف با کلیک طولانی
+                if (msg.fram_id === myUser) {
+                    div.oncontextmenu = function() { 
+                        if(confirm('حذف شود؟')) deleteMessage(msg.Id); 
+                        return false; 
+                    };
+                }
+                
+                container.appendChild(div);
+            });
+            
+            container.scrollTop = container.scrollHeight;
+            
+        } catch (err) {
+            console.error("Load Error:", err);
+        }
+    }
+
+    // حذف پیام
+    async function deleteMessage(id) {
+        try {
+            await supabase.from('Karensite').delete().eq('Id', id);
+            loadMessages();
+        } catch (e) { alert("خطا در حذف"); }
+    }
+</script>
+
+</body>
+          </html>
