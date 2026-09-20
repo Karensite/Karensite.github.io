@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Case Pro</title>
+    <style>
+        :root { --bg: #000; --panel: #111; --accent: #00ff88; --text: #eee; --border: #333; --voice: #ff4444; }
+        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, sans-serif; outline: none; -webkit-tap-highlight-color: transparent; }
+        body { margin: 0; background: var(--bg); color: var(--text); height: 100vh; overflow: hidden; display: flex; justify-content: center; }
+        
+        .app { width: 100%; max-width: 480px; background: var(--panel); height: 100%; display: flex; flex-direction: column; position: relative; z-index: 1; }
+        
+        .page { display: none; height: 100%; flex-direction: column; animation: fade 0.3s; }
+        .page.active { display: flex; }
+        @keyframes fade { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .center-box { padding: 30px; text-align: center; margin: auto; width: 90%; background: #1a1a1a; border-radius: 20px; border: 1px solid var(--border); }
+        input { width: 100%; padding: 14px; margin: 8px 0; border-radius: 12px; border: 1px solid var(--border); background: #000; color: white; transition: 0.3s; }
+        input:focus { border-color: var(--accent); }
+        button { width: 100%; padding: 14px; background: var(--accent); color: black; border: none; border-radius: 12px; cursor: pointer; font-weight: bold; margin-top: 10px; transition: 0.2s; }
+        button:active { transform: scale(0.98); }
+        button.sec { background: #333; color: white; }
+        
+        .hdr { padding: 15px; background: #161616; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; height: 60px; }
+        .hdr-title { font-weight: bold; color: var(--accent); font-size: 18px; flex: 1; text-align: center; }
+        .icon-btn { background: none; border: none; color: white; font-size: 20px; width: auto; padding: 5px; margin: 0; cursor: pointer; }
+        .contacts-btn { background: #222; color: var(--accent); border: 1px solid var(--border); padding: 8px 15px; border-radius: 20px; font-size: 13px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 5px; }
+
+        .contacts-dropdown { position: absolute; top: 60px; right: 0; left: 0; background: #1a1a1a; border-bottom: 1px solid var(--border); max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out; z-index: 50; box-shadow: 0 10px 20px rgba(0,0,0,0.5); }
+        .contacts-dropdown.open { max-height: 300px; overflow-y: auto; }
+        .search-area { padding: 10px; display: flex; gap: 5px; border-bottom: 1px solid #222; }
+        .list-item { padding: 12px 15px; border-bottom: 1px solid #222; cursor: pointer; display: flex; align-items: center; gap: 12px; transition: 0.2s; }
+        .list-item:hover { background: #222; }
+        .avatar { width: 40px; height: 40px; background: #333; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-weight: bold; color: var(--accent); }
+        .info h4 { margin: 0; font-size: 15px; color: white; }
+        .info p { margin: 2px 0 0; font-size: 12px; color: #888; }
+
+        .msgs { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 12px; background: #000; }
+        .msg { max-width: 80%; padding: 12px 16px; border-radius: 16px; font-size: 14px; line-height: 1.5; position: relative; animation: popIn 0.3s; user-select: none; }
+        @keyframes popIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        .msg.sent { background: var(--accent); color: black; align-self: flex-end; border-bottom-right-radius: 4px; }
+        .msg.rcv { background: #222; align-self: flex-start; border-bottom-left-radius: 4px; }
+        .msg-sender { font-size: 11px; opacity: 0.7; margin-bottom: 4px; display: block; }
+
+        .inp-area { padding: 12px; background: #161616; display: flex; gap: 10px; border-top: 1px solid var(--border); align-items: center; }
+        .inp-area input { margin: 0; border-radius: 25px; padding: 12px 18px; flex: 1; }
+        .action-btn { width: 45px; height: 45px; border-radius: 50%; margin: 0; display: flex; justify-content: center; align-items: center; font-size: 18px; background: #333; color: white; border: none; cursor: pointer; }
+        .voice-btn.recording { background: var(--voice); animation: pulse 1s infinite; }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+
+        /* Saved Links Section in Settings */
+        .saved-links-list { margin-top: 20px; text-align: right; }
+        .link-item { background: #222; padding: 10px; margin-bottom: 8px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; font-size: 13px; }
+        .link-item a { color: var(--accent); text-decoration: none; }
+
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 100; justify-content: center; align-items: center; backdrop-filter: blur(5px); }
+        .modal-content { background: #1a1a1a; padding: 25px; border-radius: 20px; width: 85%; max-width: 350px; border: 1px solid var(--border); text-align: center; }
+        
+        .voice-status { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.9); padding: 20px; border-radius: 15px; color: white; display: none; z-index: 200; text-align: center; }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <!-- Login Page -->
+        <div id="lp" class="page active">
+            <div class="center-box">
+                <h1 style="color:var(--accent)">Chat Case</h1>
+                <p style="color:#666;font-size:12px">نسخه نهایی با ذخیره لینک</p>
+                <input type="text" id="lu" placeholder="نام کاربری">
+                <input type="password" id="lpw" placeholder="رمز عبور">
+                <button onclick="login()">ورود به حساب</button>
+                <p id="le" style="color:red;font-size:12px;margin-top:10px"></p>
+            </div>
+        </div>
+
+        <!-- Main Chat Page -->
+        <div id="cp" class="page">
+            <div class="hdr">
+                <button class="contacts-btn" onclick="toggleContacts()">👥 مخاطبین</button>
+                <span class="hdr-title" id="ht">چت عمومی</span>
+                <div>
+                    <button class="icon-btn" onclick="showAccount()">⚙️</button>
+                </div>
+            </div>
+            
+            <div id="cd" class="contacts-dropdown">
+                <div class="search-area">
+                    <input type="text" id="si" placeholder="سرچ کاربر یا #گروه..." style="margin:0;">
+                    <button onclick="handleSearch()" style="width:50px;margin:0;background:#333;padding:10px;">🔍</button>
+                </div>
+                <div id="cl"></div>
+            </div>
+
+            <div class="msgs" id="mc">
+                <div style="text-align:center;color:#444;margin-top:50px">از دکمه مخاطبین یک چت انتخاب کنید</div>
+            </div>
+
+            <div class="inp-area">
+                <button class="action-btn voice-btn" id="vb" onclick="toggleVoice()">🎙️</button>
+                <input type="text" id="mi" placeholder="پیام..." onkeypress="if(event.key==='Enter')send()" disabled>
+                <button class="action-btn" onclick="send()" id="sb" disabled style="background:var(--accent);color:black">➤</button>
+            </div>
+        </div>
+
+        <!-- Account & Saved Links Page -->
+        <div id="ap" class="page">
+            <div class="hdr">
+                <button class="icon-btn" onclick="backToChat()">➡️</button>
+                <span class="hdr-title">تنظیمات و لینک‌ها</span>
+                <div style="width:30px"></div>
+            </div>
+            <div class="center-box" style="margin-top:20px; text-align:right;">
+                <h3 style="color:white; text-align:center">حساب کاربری</h3>
+                <div class="avatar" style="width:60px;height:60px;margin:10px auto;font-size:25px" id="acc-avatar"></div>
+                <h4 id="acc-name" style="color:var(--accent); text-align:center"></h4>
+                
+                <hr style="border-color:#333;margin:20px 0">
+                
+                <h4 style="color:white; margin-bottom:10px">🔗 لینک‌های ذخیره شده من</h4>
+                <div id="saved-links-container" class="saved-links-list">
+                    <div style="color:#666; text-align:center; font-size:12px">هنوز لینکی ذخیره نکرده‌اید</div>
+                </div>
+
+                <hr style="border-color:#333;margin:20px 0">
+                <button class="danger" onclick="clearAllData()" style="background:#ff4444;color:white">پاک کردن همه داده‌ها</button>
+                <button class="sec" onclick="logout()" style="margin-top:10px">خروج از حساب</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="vs" class="voice-status">
+        <div style="font-size:30px;margin-bottom:10px">🎙️</div>
+        <div id="vt">در حال گوش دادن...</div>
+    </div>
+
+<script>
+    const URL = 'https://lzlubkybrzkomjefqwxk.supabase.co';
+    const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx6bHVia3licnprb21qZWZxd3hrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk3MjgyODIsImV4cCI6MjEwNTMwNDI4Mn0.txxWNKJfffkE7quUKJ4v2E6EiotRHFrWDRTKVa9TYPs';
+    const HEADERS = { 'apikey': KEY, 'Authorization': `Bearer ${KEY}`, 'Content-Type': 'application/json' };
+    
+    let me = null, target = null, targetType = null;
+    const BASE_URL = 'https://karensite.github.io/';
+    let recognition;
+
+    async function apiGet(table, query = '') { return (await fetch(`${URL}/rest/v1/${table}?${query}`, { headers: HEADERS })).json(); }
+    async function apiPost(table, data) { await fetch(`${URL}/rest/v1/${table}`, { method: 'POST', headers: HEADERS, body: JSON.stringify(data) }); }
+    async function apiDelete(table, col, val) { await fetch(`${URL}/rest/v1/${table}?${col}=eq.${val}`, { method: 'DELETE', headers: HEADERS }); }
+
+    // Contacts Logic
+    function getContacts() { return JSON.parse(localStorage.getItem('my_contacts') || '[]'); }
+    function saveContact(name, type) {
+        let contacts = getContacts();
+        if(!contacts.find(c => c.name === name)) {
+            contacts.push({ name, type });
+            localStorage.setItem('my_contacts', JSON.stringify(contacts));
+        }
+        renderContacts();
+    }
+
+    // Saved Links Logic
+    function getSavedLinks() { return JSON.parse(localStorage.getItem('my_saved_links') || '[]'); }
+    function saveLink(name, url) {
+        let links = getSavedLinks();
+        if(!links.find(l => l.name === name)) {
+            links.push({ name, url });
+            localStorage.setItem('my_saved_links', JSON.stringify(links));
+            alert(`لینک گروه ${name} ذخیره شد!`);
+            renderSavedLinks();
+        } else {
+            alert('این لینک قبلاً ذخیره شده است.');
+        }
+    }
+
+    function renderContacts() {
+        const list = document.getElementById('cl');
+        list.innerHTML = '';
+        getContacts().forEach(c => {
+            const icon = c.type === 'group' ? '#' : c.name[0].toUpperCase();
+            list.innerHTML += `<div class="list-item" onclick="selectChat('${c.name}', '${c.type}')">
+                <div class="avatar">${icon}</div>
+                <div class="info"><h4>${c.name}</h4><p>${c.type === 'group' ? 'گروه' : 'کاربر'}</p></div>
+            </div>`;
+        });
+    }
+
+    function renderSavedLinks() {
+        const container = document.getElementById('saved-links-container');
+        const links = getSavedLinks();
+        if(links.length === 0) {
+            container.innerHTML = '<div style="color:#666; text-align:center; font-size:12px">هنوز لینکی ذخیره نکرده‌اید</div>';
+            return;
+        }
+        container.innerHTML = '';
+        links.forEach(l => {
+            container.innerHTML += `
+                <div class="link-item">
+                    <span>${l.name}</span>
+                    <a href="${l.url}" target="_blank">ورود 🔗</a>
+                </div>`;
+        });
+    }
+
+    function toggleContacts() {
+        const dd = document.getElementById('cd');
+        dd.classList.toggle('open');
+        if(dd.classList.contains('open')) renderContacts();
+    }
+
+    function selectChat(id, type) {
+        target = id;
+        targetType = type;
+        saveContact(id, type);
+        
+        document.getElementById('ht').innerText = type === 'group' ? `گروه: ${id}` : `چت با: ${id}`;
+        document.getElementById('mi').disabled = false;
+        document.getElementById('sb').disabled = false;
+        document.getElementById('cd').classList.remove('open');
+        
+        if(type === 'group') {
+            // Add Save Link Button to Header
+            document.getElementById('ht').innerHTML = `گروه: ${id} <button class="icon-btn" onclick="saveGroupLink('${id}')" style="font-size:14px;margin-right:10px" title="ذخیره لینک">💾</button>`;
+        }
+        
+        loadMessages();
+    }
+
+    function saveGroupLink(name) {
+        const url = `${BASE_URL}?group=${encodeURIComponent(name)}`;
+        saveLink(name, url);
+    }
+
+    async function login() {
+        const u = document.getElementById('lu').value.trim();
+        const p = document.getElementById('lpw').value;
+        if(!u || !p) return document.getElementById('le').innerText = 'اطلاعات ناقص است';
+        
+        try {
+            const blocked = await apiGet('Blocked_users', `username=eq.${u}`);
+            if(blocked && blocked.length > 0) return document.getElementById('le').innerText = 'حساب شما مسدود شده است';
+        } catch(e) {}
+
+        me = u;
+        document.getElementById('lp').classList.remove('active');
+        document.getElementById('cp').classList.add('active');
+        document.getElementById('acc-name').innerText = u;
+        document.getElementById('acc-avatar').innerText = u[0].toUpperCase();
+        
+        renderSavedLinks(); // Load saved links on login
+        checkUrlParams();
+        initVoice();
+    }
+
+    function showAccount() { 
+        document.getElementById('cp').classList.remove('active'); 
+        document.getElementById('ap').classList.add('active'); 
+        renderSavedLinks();
+    }
+    function backToChat() { document.getElementById('ap').classList.remove('active'); document.getElementById('cp').classList.add('active'); }
+    function clearAllData() { if(confirm('همه چیز پاک شود؟')) { localStorage.clear(); location.reload(); } }
+    function logout() { location.reload(); }
+
+    async function handleSearch() {
+        const q = document.getElementById('si').value.trim();
+        if(!q) return;
+        if(q.startsWith('#')) { selectChat(q.substring(1), 'group'); return; }
+        const data = await apiGet('Karensite', `fram_id=eq.${q}&limit=1`);
+        if(data && data.length > 0) selectChat(q, 'private');
+        else alert('کاربر یافت نشد.');
+    }
+
+    function checkUrlParams() {
+        const group = new URLSearchParams(window.location.search).get('group');
+        if(group) selectChat(decodeURIComponent(group), 'group');
+    }
+
+    async function loadMessages() {
+        if(!target) return;
+        const data = await apiGet('Karensite', `or=(and(fram_id.eq.${me},To_id.eq.${target}),and(fram_id.eq.${target},To_id.eq.${me}))&order=Id.asc&limit=50`);
+        const c = document.getElementById('mc');
+        c.innerHTML = '';
+        data.forEach(m => {
+            const d = document.createElement('div');
+            d.className = `msg ${m.fram_id === me ? 'sent' : 'rcv'}`;
+            d.innerHTML = targetType === 'group' ? `<span class="msg-sender">${m.fram_id}</span>${m.Content}` : m.Content;
+            if(m.fram_id === me) {
+                let timer;
+                d.addEventListener('touchstart', () => { timer = setTimeout(() => deleteMsg(m.Id), 800); });
+                d.addEventListener('mousedown', () => { timer = setTimeout(() => deleteMsg(m.Id), 800); });
+                d.addEventListener('touchend', () => clearTimeout(timer));
+                d.addEventListener('mouseup', () => clearTimeout(timer));
+            }
+            c.appendChild(d);
+        });
+        c.scrollTop = c.scrollHeight;
+    }
+
+    async function send() {
+        const i = document.getElementById('mi');
+        if(!i.value.trim() || !target) return;
+        await apiPost('Karensite', [{ fram_id: me, To_id: target, Content: i.value, Type: targetType }]);
+        i.value = '';
+        loadMessages();
+        const allMsgs = await apiGet('Karensite', `or=(and(fram_id.eq.${me},To_id.eq.${target}),and(fram_id.eq.${target},To_id.eq.${me}))&order=Id.asc`);
+        if(allMsgs.length > 50) apiDelete('Karensite', 'Id', allMsgs[0].Id);
+    }
+
+    async function deleteMsg(id) { if(confirm('حذف شود؟')) { await apiDelete('Karensite', 'Id', id); loadMessages(); } }
+
+    function initVoice() {
+        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+            const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+            recognition = new SR();
+            recognition.lang = 'fa-IR';
+            recognition.onstart = () => { document.getElementById('vb').classList.add('recording'); document.getElementById('vs').style.display = 'block'; };
+            recognition.onend = () => { document.getElementById('vb').classList.remove('recording'); document.getElementById('vs').style.display = 'none'; };
+            recognition.onresult = (e) => { document.getElementById('mi').value += e.results[0][0].transcript + " "; };
+        }
+    }
+    function toggleVoice() { if(recognition) try { recognition.start(); } catch(e) { recognition.stop(); } }
+</script>
+</body>
+                                                                                                                  </html>
